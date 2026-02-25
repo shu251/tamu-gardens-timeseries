@@ -1,0 +1,134 @@
+---
+title: "data-dashboard"
+format: html
+server: shiny
+theme: theme.scss
+editor: source
+---
+
+```{r}
+#| context: setup
+#| warning: false
+#| message: false
+
+library(shiny)
+library(tidyverse)
+library(bslib)
+library(palmerpenguins)
+```
+```{r}
+tib_tags <- tibble::tibble(
+  headings = c(
+    'Cool stuff 🚀',
+    'More cool stuff 💰',
+    'Extra super cool thing 💡',
+    'A fifth cool thing, yay 🧲'
+  ),
+  text = 'Duis imperdiet, est vitae mollis porttitor, neque metus ornare urna, a ullamcorper dolor sem at tellus.' 
+) |> 
+  dplyr::mutate(
+    headings = purrr::map(
+      headings, 
+      \(x) htmltools::div(htmltools::strong(x))
+    ),
+    text = purrr::map(
+      text, 
+      htmltools::div
+    ),
+    combined = purrr::map2(
+      headings,
+      text,
+      \(x, y) htmltools::div(
+        style = htmltools::css(
+          width = '300px',
+          margin_right = '20px',
+          margin_bottom = '20px'
+        ),
+        x, 
+        y
+      )
+    )
+  )
+htmltools::div(
+  style = htmltools::css(
+    display = 'flex',
+    flex_wrap = 'wrap'
+  ),
+  tib_tags$combined
+)
+```
+
+
+```{r}
+#| column: page
+layout_sidebar(
+  height = 600,
+  sidebar =  sidebar(
+    shiny::selectizeInput(
+      'select_species', 
+      'Highlighted Species', 
+      choices = c('Adelie', 'Chinstrap', 'Gentoo'),
+      selected = c('Adelie', 'Chinstrap', 'Gentoo'),
+      multiple = TRUE
+    ),
+    shiny::sliderInput(
+      'slider_weight',
+      'Minimum Weight (g)',
+      min = 1000,
+      max = 5000,
+      value = 3000
+    )
+  ),
+  shiny::plotOutput('output_plot')
+)
+```
+
+```{r}
+#| context: server
+output$output_plot <- shiny::renderPlot({
+  # Data import
+  palmerpenguins::penguins |> 
+    dplyr::filter(
+      species %in% input$select_species,
+      body_mass_g >= input$slider_weight
+    ) |> 
+    ggplot(
+      aes(
+        x = bill_length_mm, 
+        y = flipper_length_mm, 
+        fill = species
+      )
+    ) +
+    geom_point(
+      shape = 21, 
+      size = 6, 
+      col = 'black'
+    ) +
+    labs(
+      x = 'Bill length (in mm)',
+      y = 'Flipper length (in mm)',
+      fill = 'Species',
+      title = 'Penguins from the Palmer Archipelago'
+    ) +
+    theme_minimal(
+      base_size = 20, 
+      base_family = 'Source Sans Pro'
+    ) +
+    scale_fill_manual(
+      values = c(
+        Adelie = '#0072B2', 
+        Gentoo = '#009E73',
+        Chinstrap = '#CC79A7'
+      ),
+    ) +
+    coord_cartesian(
+      xlim = c(30, 60), 
+      ylim = c(170, 240)
+    )
+})
+```
+
+
+---
+
+---

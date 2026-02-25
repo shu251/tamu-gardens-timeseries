@@ -1,0 +1,25 @@
+project:
+  type: website
+  output-dir: docs
+  render:
+    - tgif-home.qmd
+
+
+website:
+  title: "TAMU Gardens in Focus"
+  navbar:
+    left:
+      - href: tgif-home.qmd
+        text: Home
+
+format:
+  html:
+    theme: minty
+    css: styles.css
+    code-fold: true
+    toc: true
+    toc-location: left
+    number-sections: true
+    number-depth: 2
+
+

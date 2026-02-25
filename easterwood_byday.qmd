@@ -1,0 +1,147 @@
+---
+title: "data-dashboard"
+format: html
+server: shiny
+theme: theme.scss
+editor: source
+---
+
+```{r}
+#| context: setup
+#| warning: false
+#| message: false
+
+library(shiny)
+library(tidyverse)
+library(bslib)
+library(lubridate)
+library(palmerpenguins)
+class(penguins)
+```
+```{r}
+tib_tags <- tibble::tibble(
+  headings = c(
+    'Airport air temperature',
+    'TGIF💰'),
+  text = c('Duis imperdiet, est vitae mollis porttitor, neque metus ornare urna, a ullamcorper dolor sem at tellus.' 
+, "project information")) |> 
+  dplyr::mutate(
+    headings = purrr::map(
+      headings, 
+      \(x) htmltools::div(htmltools::strong(x))
+    ),
+    text = purrr::map(
+      text, 
+      htmltools::div
+    ),
+    combined = purrr::map2(
+      headings,
+      text,
+      \(x, y) htmltools::div(
+        style = htmltools::css(
+          width = '300px',
+          margin_right = '20px',
+          margin_bottom = '20px'
+        ),
+        x, 
+        y
+      )
+    )
+  )
+htmltools::div(
+  style = htmltools::css(
+    display = 'flex',
+    flex_wrap = 'wrap'
+  ),
+  tib_tags$combined
+)
+```
+
+
+```{r}
+#| column: page
+layout_sidebar(
+  height = 600,
+  sidebar =  sidebar(
+    shiny::selectizeInput(
+      'DAY', 
+      'Select day', 
+      choices = c('1', '2', '3'),
+      selected = c('1', '2', '3'),
+      multiple = TRUE
+    )
+    # shiny::sliderInput(
+    #   'slider_weight',
+    #   'Minimum Weight (g)',
+    #   min = 1000,
+    #   max = 5000,
+    #   value = 3000
+    # )
+  ),
+  shiny::plotOutput('output_plot')
+)
+```
+
+```{r}
+# Easterwood_Weather <- read.csv(file = "input-data/KCLL.csv", skip = 8, row.names = NULL, header = FALSE) %>% 
+#   rename(
+#     Date_Time = V2,
+#     Air_Temp_F = V3,
+#     Humidity = V4,
+#     Wind_Speed_mph = V5
+#   ) %>%
+#   select(-V1,-V6) %>% 
+#   mutate(FORMAT_DAY = mdy_hm(Date_Time, tz = "UTC"))
+# Air_Temp_easterwood <- Easterwood_Weather %>%
+#   mutate(DAY = day(FORMAT_DAY),
+#          HOUR = hour(FORMAT_DAY),
+#          MONTH = month(FORMAT_DAY)) %>%
+#   group_by(MONTH, DAY, HOUR) %>%
+#   summarise(Air_Temp_F_hr_MEAN = mean(Air_Temp_F),
+#             Air_Temp_F_hr_MAX = max(Air_Temp_F),
+#             Air_Temp_F_hr_MIN = min(Air_Temp_F))
+# save(Easterwood_Weather, file = "weather.RData")
+```
+
+
+```{r}
+#| context: server
+output$output_plot <- shiny::renderPlot({
+  read.csv(file = "input-data/KCLL.csv", skip = 8, row.names = NULL, header = FALSE) %>% 
+  rename(
+    Date_Time = V2,
+    Air_Temp_F = V3,
+    Humidity = V4,
+    Wind_Speed_mph = V5
+  ) %>%
+  select(-V1,-V6) %>% 
+  mutate(FORMAT_DAY = mdy_hm(Date_Time, tz = "UTC")) %>% 
+  mutate(DAY = day(FORMAT_DAY),
+         HOUR = hour(FORMAT_DAY),
+         MONTH = month(FORMAT_DAY)) %>%
+  group_by(MONTH, DAY, HOUR) %>%
+  summarise(Air_Temp_F_hr_MEAN = mean(Air_Temp_F),
+            Air_Temp_F_hr_MAX = max(Air_Temp_F),
+            Air_Temp_F_hr_MIN = min(Air_Temp_F)) %>% 
+  filter(DAY %in% input$DAY) %>%
+  ggplot(aes(x = HOUR, y = Air_Temp_F_hr_MEAN)) +
+  geom_errorbar(aes(ymin = Air_Temp_F_hr_MIN, ymax = Air_Temp_F_hr_MAX),
+                color = "violet", width = 0.5) +
+  geom_point(color = "purple", size = 3) +
+  labs(x = "Hours", y = "Temperature (F)", title = "Median Temp by Hour on 10/1") +
+  theme(axis.text.x = element_text(family = "Times New Roman"), 
+        axis.text.y = element_text(family = "Times New Roman"), 
+        axis.title.x = element_text(family = "Times New Roman"), 
+        axis.title.y = element_text(family = "Times New Roman"),
+        title = element_text(family = "Times New Roman", face = "bold")) +
+  theme(
+    plot.background = element_blank(),   # Remove plot background
+    panel.grid.minor = element_blank()   # Remove minor grid lines
+  )
+})
+```
+
+
+---
+
+---
