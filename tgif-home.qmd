@@ -1,5 +1,5 @@
 ---
-title: "TGIF"
+title: ""
 format: html
 editor: visual
 ---
@@ -8,7 +8,7 @@ editor: visual
 
 ## Who is running this?
 
-TAMU Undergraduates Abigail Day & Meagan Sonsel, as part of [the Hu lab](https://shu251.github.io/sarah-hu/) in the Department of Oceanography.
+TAMU students as part of [the Hu lab](https://shu251.github.io/sarah-hu/) in the Department of Oceanography.
 
 # White Creek
 
@@ -22,4 +22,6 @@ Time-series stations are crucial for understanding and monitoring changing envir
 
 None of this could be done, however, without the continuous sampling of a study area. In our case, monthly sampling provides the perfect balance between practicality and temporal resolution. Many studied environments experience seasonal changes, and monthly monitoring allows researchers to get a clear picture of this without being overwhelmed by data volume. Seasonal changes can show us plant growth, animal migration, and weather patterns, which are crucial to understanding the health and dynamics of an ecosystem. Complex ecosystems cannot be understood in full by a short-term study; continuous monitoring and long-term data collection allow us to see the full picture of an environment. By furthering our understanding through time-series stations, researchers can support their studies and can provide crucial information to weather stations and policymakers.
 
-# Data collected
+
+::: column-margin
+![](images/tgif-hex.png)
