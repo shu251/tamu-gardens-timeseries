@@ -1,0 +1,20 @@
+---
+title: "Sample collection"
+editor: visual
+---
+
+# Sampling at TAMU Gardens
+
+
+
+## Temperature
+
+## Turbidity
+
+## Salinity
+
+## pH
+
+## Chlorophyll
+
+## Plankton tow

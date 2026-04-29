@@ -1,0 +1,93 @@
+---
+title: "Monthly data report"
+format: html
+editor: visual
+---
+
+# USGS Water Data
+
+Carters Creek in College Station: 08111051
+
+Thompsons Create in Bryan: 08109310
+
+```{r}
+# | message: false
+# | warning: false
+library(dataRetrieval);library(tidyverse)
+read_waterdata_monitoring_location(
+  monitoring_location_id = c("USGS-08111051", "USGS-08109310"), 
+  agency_code = "USGS", skipGeometry = TRUE,
+  properties = c("monitoring_location_id",        
+                 "agency_code",
+                 "monitoring_location_number",
+                 "monitoring_location_name", "county_name", "site_type", "hydrologic_unit_code", "basin_code", "altitude"))
+# ?read_waterdata_monitoring_location
+```
+
+[Derived from agency codes.](https://api.waterdata.usgs.gov/ogcapi/v0/collections/parameter-codes/items)
+
+```{r}
+# | message: false
+# | warning: false
+# ?read_waterdata_continuous()
+gauge_local_creeks <- read_waterdata_continuous(monitoring_location_id = c("USGS-08111051", "USGS-08109310"),
+                          parameter_code = c("00065"),
+                          properties = c("continuous_id", "monitoring_location_id", "parameter_code", "statistic_id", "time", "value", "unit_of_measure"),
+                          last_modified = "P25D")
+```
+
+```{r}
+# head(gauge_local_creeks)
+# unique(gauge_local_creeks$monitoring_location_id)
+```
+
+```{r}
+gauge_local_creeks %>% 
+  mutate(Creek = case_when(
+    monitoring_location_id == "USGS-08111051" ~ "Carter's Creek",
+    monitoring_location_id == "USGS-08109310" ~ "Thompson's Creek"
+  ),
+  gauge_m = (value*(0.3048))) %>% # convert to meters
+  # Capture time
+  mutate(FORMAT_DAY = ymd_hms(time, tz = "UTC")) %>% 
+  mutate(DAY = day(FORMAT_DAY),
+         HOUR = hour(FORMAT_DAY),
+         MONTH = month(FORMAT_DAY)) %>%
+  group_by(Creek, MONTH, DAY) %>%
+  summarise(gauge_avg = mean(gauge_m),
+            gauge_max = max(gauge_m),
+            gauge_min = min(gauge_m)) %>% 
+  ggplot(aes(x = DAY, y = gauge_avg)) +
+  geom_errorbar(aes(ymin = gauge_min, ymax = gauge_max),
+                color = "violet", width = 0.5) +
+  geom_point(color = "purple", size = 3) +
+  labs(x = "Day", y = "Creek gauge height (m)", title = "Local creek water level") +
+  theme_classic() +
+  theme(
+    plot.background = element_blank(),   # Remove plot background
+    panel.grid.minor = element_blank()   # Remove minor grid lines
+  )
+  
+  
+  
+```
+
+Carters Creek in College Station: 08111051
+
+Thompsons Create in Bryan: 08109310
+# Weather data
+
+```{r}
+# library("devtools")
+# install_github("Ram-N/weatherData")
+library(weatherData)
+```
+
+```{r}
+# ?getSummarizedWeather
+getWeatherForDate(station_id = "CLL", 
+                     start_date = "2026-02-20", 
+                     station_type = "airportCode") 
+
+# getWeatherForDate("SEA", "2014-04-01", end_date="2014-04-30")
+```
