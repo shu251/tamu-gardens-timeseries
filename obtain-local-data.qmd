@@ -57,10 +57,12 @@ gauge_local_creeks %>%
   summarise(gauge_avg = mean(gauge_m),
             gauge_max = max(gauge_m),
             gauge_min = min(gauge_m)) %>% 
+  drop_na() %>% 
   ggplot(aes(x = DAY, y = gauge_avg)) +
   geom_errorbar(aes(ymin = gauge_min, ymax = gauge_max),
-                color = "violet", width = 0.5) +
-  geom_point(color = "purple", size = 3) +
+                color = "black", width = 0.5) +
+  geom_point(color = "black", size = 3) +
+  facet_grid(cols = vars(Creek), rows = vars(MONTH)) +
   labs(x = "Day", y = "Creek gauge height (m)", title = "Local creek water level") +
   theme_classic() +
   theme(
