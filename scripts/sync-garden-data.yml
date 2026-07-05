@@ -1,0 +1,47 @@
+name: Sync garden sensor data from Slack
+
+on:
+  schedule:
+    # Every Friday 23:30 Central Time.
+    # GitHub Actions cron is UTC and does not shift for DST, so this is
+    # pinned to CDT (UTC-5): Fri 23:30 CDT = Sat 04:30 UTC.
+    # During Standard Time (CST, UTC-6, roughly Nov-Mar) this will
+    # actually fire at 10:30pm local instead of 11:30pm — nudge the
+    # minute/hour below by one if that matters for your workflow.
+    - cron: "30 4 * * 6"
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install slack_sdk pandas openpyxl requests
+
+      - name: Check #tgif and sync new files
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: python scripts/sync_garden_data.py
+
+      - name: Commit and push if new data was added
+        run: |
+          git config user.name "garden-data-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/garden/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Sync garden sensor data from #tgif"
+            git push
+          fi

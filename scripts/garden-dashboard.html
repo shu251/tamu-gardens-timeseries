@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TAMU Gardens in Focus — Data Dashboard</title>
+<meta name="description" content="Live environmental monitoring for the TAMU Gardens study site: weather, river conditions, and garden sensor logs.">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+
+<style>
+  :root{
+    --bg:         #FFFFFF;
+    --bg-subtle:  #F7F7F4;
+    --ink:        #1D201D;
+    --ink-soft:   #6B6F68;
+    --ink-faint:  #9A9D96;
+    --line:       #E7E6E0;
+    --line-soft:  #F0EFEA;
+    --sage:       #4F7B5C;
+    --sage-soft:  rgba(79,123,92,0.09);
+    --sky:        #3F739A;
+    --sky-soft:   rgba(63,115,154,0.09);
+    --gold:       #B8863B;
+    --gold-soft:  rgba(184,134,59,0.10);
+    --err:        #B0503B;
+    --err-soft:   rgba(176,80,59,0.08);
+    --radius:     12px;
+    --radius-sm:  7px;
+    --shadow:     0 1px 2px rgba(20,20,15,0.04), 0 6px 20px rgba(20,20,15,0.04);
+  }
+
+  *{ box-sizing: border-box; }
+  html{ scroll-behavior: smooth; }
+
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    html{ scroll-behavior: auto; }
+    *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  a{ color: var(--sage); }
+  a:focus-visible, button:focus-visible, select:focus-visible{
+    outline: 2px solid var(--sky);
+    outline-offset: 2px;
+  }
+
+  .wrap{ max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- Header ---------- */
+  header.masthead{
+    padding: 40px 0 24px;
+  }
+  .masthead-row{
+    display:flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap;
+  }
+  .site-name{
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-weight: 700;
+    font-size: clamp(26px, 3.6vw, 34px);
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+  .site-sub{
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+  }
+  .as-of{
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 11.5px;
+    text-align: right;
+    color: var(--ink-faint);
+  }
+  .as-of .dot{
+    display:inline-block; width:6px; height:6px; border-radius:50%;
+    background: var(--sage); margin-right:6px; position:relative; top:-1px;
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ---------- Readout strip ---------- */
+  .readout{
+    margin-top: 24px;
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    background: var(--bg-subtle);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .readout-cell{
+    padding: 18px 22px;
+    border-left: 1px solid var(--line);
+  }
+  .readout-cell:first-child{ border-left: none; }
+  .readout-label{
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    color: var(--ink-faint);
+  }
+  .readout-value{
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-weight: 500;
+    font-size: 24px;
+    color: var(--ink);
+    margin-top: 5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .readout-value .unit{ font-size: 12px; font-weight: 400; color: var(--ink-faint); margin-left: 3px; }
+  .readout-value.loading{ color: var(--ink-faint); font-size: 13px; font-weight: 400; }
+
+  /* ---------- Nav ---------- */
+  nav.tabs{
+    display:flex; gap: 22px; margin-top: 8px;
+    border-bottom: 1px solid var(--line);
+    position: sticky; top:0; background: rgba(255,255,255,0.92);
+    backdrop-filter: saturate(180%) blur(6px);
+    z-index: 10;
+  }
+  nav.tabs a{
+    font-size: 13px; font-weight: 500;
+    text-decoration:none; color: var(--ink-soft);
+    padding: 14px 2px 12px;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  nav.tabs a:hover{ color: var(--ink); border-color: var(--line); }
+
+  /* ---------- Cards / sections ---------- */
+  main{ padding: 36px 0 64px; }
+  section.card{
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 22px;
+    scroll-margin-top: 68px;
+  }
+  section.card .card-head{
+    display:flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;
+    padding: 20px 24px 16px;
+  }
+  h2.card-title{
+    font-size: 17px; font-weight: 600; margin:0;
+    display:flex; align-items:center; gap:9px;
+  }
+  h2.card-title::before{
+    content:"";
+    display:inline-block; width:8px; height:8px; border-radius:50%;
+  }
+  section.card[data-accent="weather"] h2.card-title::before{ background: var(--gold); }
+  section.card[data-accent="river"] h2.card-title::before{ background: var(--sky); }
+  section.card[data-accent="garden"] h2.card-title::before{ background: var(--sage); }
+
+  .card-meta{
+    font-size: 12px; color: var(--ink-faint);
+  }
+  .card-body{ padding: 4px 24px 26px; }
+
+  .chart-holder{ position: relative; height: 250px; }
+  .chart-toolbar{
+    display:flex; justify-content: flex-end; margin-top: 6px;
+  }
+  .zoom-reset{
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .zoom-reset:hover{ color: var(--ink); }
+  .chart-note{
+    font-size: 12px; color: var(--ink-faint); margin-top: 10px;
+  }
+
+  table.data-table{
+    width:100%; border-collapse: collapse; margin-top: 16px;
+    font-size: 13.5px;
+  }
+  table.data-table th, table.data-table td{
+    text-align:left; padding: 8px 4px; border-bottom: 1px solid var(--line-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  table.data-table th{
+    font-size: 11px; font-weight: 500;
+    color: var(--ink-faint);
+  }
+
+  .field-row{ display:flex; gap: 14px; align-items:center; flex-wrap: wrap; margin-bottom: 14px; }
+  select.picker{
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    padding: 7px 12px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+  }
+  label.picker-label{
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+
+  .badge{
+    display:inline-block;
+    font-size: 11px; font-weight: 500;
+    padding: 3px 9px; border-radius: 20px;
+    background: var(--sage-soft); color: var(--sage);
+  }
+
+  .empty-state{
+    border: 1px dashed var(--line);
+    border-radius: var(--radius-sm);
+    padding: 28px 22px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: var(--bg-subtle);
+  }
+  .empty-state code{
+    background: var(--line-soft); padding: 1px 5px; border-radius: 4px; font-size: 12px;
+  }
+
+  .error-note{
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: 12.5px;
+    color: var(--err);
+    background: var(--err-soft);
+  }
+
+  footer{
+    border-top: 1px solid var(--line);
+    padding: 24px 0 48px;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+  footer a{ color: inherit; }
+  footer .foot-row{ display:flex; justify-content: space-between; flex-wrap: wrap; gap:8px; margin-top: 6px; }
+
+  @media (max-width: 560px){
+    .masthead-row{ flex-direction: column; align-items: flex-start; }
+    .as-of{ text-align: left; }
+    nav.tabs{ overflow-x:auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap masthead-row">
+    <div>
+      <p class="site-name">TAMU Gardens in Focus</p>
+      <p class="site-sub">Field station · College Station, TX · 30.61° N, 96.32° W</p>
+    </div>
+    <div class="as-of">
+      <span class="dot"></span><span id="asOfText">Loading current readings…</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="readout" id="readoutStrip">
+      <div class="readout-cell">
+        <div class="readout-label" id="ro-garden-label">White Creek Temperature</div>
+        <div class="readout-value loading" id="ro-garden">— —</div>
+      </div>
+      <div class="readout-cell">
+        <div class="readout-label">Brazos River Stage</div>
+        <div class="readout-value loading" id="ro-stage">— —</div>
+      </div>
+      <div class="readout-cell">
+        <div class="readout-label">Air Temp — KCLL</div>
+        <div class="readout-value loading" id="ro-temp">— —</div>
+      </div>
+      <div class="readout-cell">
+        <div class="readout-label">Rainfall, last hr</div>
+        <div class="readout-value loading" id="ro-precip">— —</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <a href="#garden">White Creek</a>
+  <a href="#river">River</a>
+  <a href="#weather">Weather</a>
+</nav>
+
+<main class="wrap">
+
+  <!-- ============ WHITE CREEK TEMPERATURE (garden sensor) ============ -->
+  <section class="card" id="garden" data-accent="garden">
+    <div class="card-head">
+      <h2 class="card-title">White Creek Temperature</h2>
+      <span class="card-meta">Synced from Slack <code>#tgif</code></span>
+    </div>
+    <div class="card-body">
+      <div id="gardenContent">
+        <p class="chart-note">Loading synced sensor files…</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RIVER ============ -->
+  <section class="card" id="river" data-accent="river">
+    <div class="card-head">
+      <h2 class="card-title">Brazos River</h2>
+      <span class="card-meta">USGS 08109500 · nr College Station, TX</span>
+    </div>
+    <div class="card-body">
+      <div id="riverError"></div>
+      <div class="chart-holder"><canvas id="riverChart"></canvas></div>
+      <div class="chart-toolbar"><button class="zoom-reset" id="riverZoomReset" type="button">Reset zoom</button></div>
+      <p class="chart-note">Gage height, past 7 days, 15-min intervals. Scroll or pinch to zoom, drag to pan. Source: USGS Water Data API.</p>
+      <table class="data-table" id="riverTable">
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ WEATHER ============ -->
+  <section class="card" id="weather" data-accent="weather">
+    <div class="card-head">
+      <h2 class="card-title">Weather</h2>
+      <span class="card-meta">NWS station KCLL · Easterwood Field</span>
+    </div>
+    <div class="card-body">
+      <div id="weatherError"></div>
+      <div class="chart-holder"><canvas id="weatherChart"></canvas></div>
+      <div class="chart-toolbar"><button class="zoom-reset" id="weatherZoomReset" type="button">Reset zoom</button></div>
+      <p class="chart-note">Hourly observations, most recent ~48 reports. Scroll or pinch to zoom, drag to pan. Source: api.weather.gov.</p>
+      <table class="data-table" id="weatherTable">
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <div>Data sources: <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service</a> · <a href="https://waterdata.usgs.gov/" target="_blank" rel="noopener">USGS Water Data</a> · garden sensor files synced from Slack #tgif via scheduled GitHub Action.</div>
+  <div class="foot-row">
+    <span>Weather and river readings are fetched live from public APIs on each page load.</span>
+    <span>Garden sensor data updates when new files land in #tgif — see /scripts/sync_garden_data.py.</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+
+  // ---- Configuration — adjust here if the monitoring site changes ----
+  var NWS_STATION = 'KCLL';               // College Station, Easterwood Field
+  var USGS_SITE    = '08109500';          // Brazos Rv nr College Station, TX
+  var GARDEN_MANIFEST = 'data/garden/manifest.json';
+
+  var moss = '#4F7B5C', water = '#3F739A', amber = '#B8863B';
+  var weatherChartRef = null, riverChartRef = null;
+
+  function wireZoomReset(buttonId, getChart){
+    var btn = document.getElementById(buttonId);
+    if (!btn) return;
+    btn.addEventListener('click', function(){
+      var chart = getChart();
+      if (chart && chart.resetZoom) chart.resetZoom();
+    });
+  }
+  wireZoomReset('weatherZoomReset', function(){ return weatherChartRef; });
+  wireZoomReset('riverZoomReset', function(){ return riverChartRef; });
+
+  function fmtTime(d){
+    return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+  }
+  function setAsOf(){
+    document.getElementById('asOfText').textContent = 'Page loaded ' + fmtTime(new Date());
+  }
+  setAsOf();
+
+  function baseChartOptions(yLabel){
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false },
+        zoom: {
+          pan: { enabled: true, mode: 'x' },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            drag: { enabled: true, backgroundColor: 'rgba(63,115,154,0.12)' },
+            mode: 'x'
+          },
+          limits: { x: { minRange: 3 } }
+        }
+      },
+      scales: {
+        x: { ticks: { font: { family: 'Helvetica Neue', size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { color: 'rgba(0,0,0,0.06)' } },
+        y: { ticks: { font: { family: 'Helvetica Neue', size: 10 } }, grid: { color: 'rgba(0,0,0,0.06)' }, title: { display: !!yLabel, text: yLabel, font: { family: 'Helvetica Neue', size: 10 } } }
+      }
+    };
+  }
+
+  function showError(elId, msg){
+    var el = document.getElementById(elId);
+    el.innerHTML = '<div class="error-note">' + msg + '</div>';
+  }
+
+  function fillTable(tableId, rows){
+    var tbody = document.querySelector('#' + tableId + ' tbody');
+    tbody.innerHTML = '';
+    rows.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + r[0] + '</td><td>' + r[1] + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  // =====================================================================
+  // WEATHER — api.weather.gov (NWS), no key required, CORS-enabled
+  // =====================================================================
+  function fetchTimeout(url, ms){
+    var controller = new AbortController();
+    var timer = setTimeout(function(){ controller.abort(); }, ms || 12000);
+    return fetch(url, { signal: controller.signal }).finally(function(){ clearTimeout(timer); });
+  }
+
+  function renderWeatherCurrent(p){
+    var tF = p.temperature && p.temperature.value !== null ? Math.round((p.temperature.value * 9/5 + 32) * 10) / 10 : null;
+    var precipIn = p.precipitationLastHour && p.precipitationLastHour.value !== null ? Math.round((p.precipitationLastHour.value / 25.4) * 100) / 100 : null;
+    var humidity = p.relativeHumidity && p.relativeHumidity.value !== null ? Math.round(p.relativeHumidity.value) : null;
+    var windMph = p.windSpeed && p.windSpeed.value !== null ? Math.round(p.windSpeed.value * 0.621371 * 10) / 10 : null;
+    var pressureIn = p.barometricPressure && p.barometricPressure.value !== null ? Math.round((p.barometricPressure.value / 3386.39) * 100) / 100 : null;
+
+    document.getElementById('ro-temp').innerHTML = (tF !== null ? tF : '—') + '<span class="unit">°F</span>';
+    document.getElementById('ro-temp').classList.remove('loading');
+    document.getElementById('ro-precip').innerHTML = (precipIn !== null ? precipIn : '0') + '<span class="unit">in</span>';
+    document.getElementById('ro-precip').classList.remove('loading');
+
+    fillTable('weatherTable', [
+      ['Observed', fmtTime(new Date(p.timestamp))],
+      ['Temperature', (tF !== null ? tF + ' °F' : '— (station not currently reporting temperature)')],
+      ['Relative humidity', (humidity !== null ? humidity + ' %' : '—')],
+      ['Wind speed', (windMph !== null ? windMph + ' mph' : '—')],
+      ['Barometric pressure', (pressureIn !== null ? pressureIn + ' inHg' : '—')],
+      ['Conditions', p.textDescription || '—']
+    ]);
+    return tF;
+  }
+
+  function loadWeather(){
+    fetchTimeout('https://api.weather.gov/stations/' + NWS_STATION + '/observations?limit=48', 12000)
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(json){
+        var feats = (json.features || []).slice().reverse();
+        var labels = [], temps = [];
+        feats.forEach(function(f){
+          var p = f.properties;
+          if (p.temperature && p.temperature.value !== null){
+            labels.push(fmtTime(new Date(p.timestamp)));
+            temps.push(Math.round((p.temperature.value * 9/5 + 32) * 10) / 10);
+          }
+        });
+
+        if (!temps.length){
+          // Station returned observations but none had a temperature value —
+          // fall back to the single latest reading instead of a blank chart.
+          throw new Error('No temperature values in the last 48 observations');
+        }
+
+        weatherChartRef = new Chart(document.getElementById('weatherChart'), {
+          type: 'line',
+          data: { labels: labels, datasets: [{ data: temps, borderColor: amber, backgroundColor: 'rgba(184,134,59,0.08)', fill: true, tension: 0.25, pointRadius: 0, borderWidth: 2 }] },
+          options: baseChartOptions('°F')
+        });
+
+        var latest = feats[feats.length - 1];
+        renderWeatherCurrent(latest.properties);
+      })
+      .catch(function(err){
+        // Primary call failed (or had no temp data) — try the single latest
+        // observation before giving up, so a rough current reading still shows.
+        fetchTimeout('https://api.weather.gov/stations/' + NWS_STATION + '/observations/latest', 8000)
+          .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(function(json){
+            document.getElementById('weatherChart').closest('.chart-holder').style.display = 'none';
+            showError('weatherError', 'Only the latest reading is available right now — chart history failed to load (' + err.message + ').');
+            renderWeatherCurrent(json.properties);
+          })
+          .catch(function(err2){
+            showError('weatherError',
+              'Could not load live weather data from NWS station ' + NWS_STATION + '. ' +
+              'First error: ' + err.message + '. Fallback error: ' + err2.message + '. ' +
+              'If you\'re viewing this file locally (not via GitHub Pages), open the browser console — some browsers block cross-origin fetches from a file:// page.');
+            document.getElementById('ro-temp').textContent = 'n/a';
+            document.getElementById('ro-precip').textContent = 'n/a';
+          });
+      });
+  }
+
+  // =====================================================================
+  // RIVER — USGS Water Data API (api.waterdata.usgs.gov), no key required
+  // for light traffic. NOTE: the old waterservices.usgs.gov/nwis/iv
+  // endpoint (used previously) is being decommissioned by USGS through
+  // 2026-2027 and is now unreliable — this uses its replacement.
+  // =====================================================================
+  function loadRiver(){
+    var locationId = 'USGS-' + USGS_SITE;
+    var historyUrl = 'https://api.waterdata.usgs.gov/ogcapi/v0/collections/continuous/items' +
+      '?f=json&monitoring_location_id=' + locationId + '&parameter_code=00065,00060&datetime=P7D&limit=1500';
+
+    function renderRiver(points){
+      var stagePts = points.filter(function(p){ return p.parameter_code === '00065'; })
+        .sort(function(a,b){ return new Date(a.time) - new Date(b.time); });
+      var flowPts = points.filter(function(p){ return p.parameter_code === '00060'; })
+        .sort(function(a,b){ return new Date(a.time) - new Date(b.time); });
+
+      if (!stagePts.length && !flowPts.length) throw new Error('no gage height or discharge points returned');
+
+      // Prefer gage height for the chart; fall back to discharge if this
+      // site doesn't report stage.
+      var usingStage = stagePts.length > 0;
+      var chartPts = usingStage ? stagePts : flowPts;
+      var labels = chartPts.map(function(p){ return fmtTime(new Date(p.time)); });
+      var vals = chartPts.map(function(p){ return parseFloat(p.value); });
+
+      riverChartRef = new Chart(document.getElementById('riverChart'), {
+        type: 'line',
+        data: { labels: labels, datasets: [{ data: vals, borderColor: water, backgroundColor: 'rgba(63,115,154,0.08)', fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2 }] },
+        options: baseChartOptions(usingStage ? 'ft' : 'ft³/s')
+      });
+      if (!usingStage){
+        showError('riverError', 'This site isn\'t currently reporting gage height — showing discharge instead.');
+      }
+
+      var rows = [];
+      var stageLatest = stagePts.length ? stagePts[stagePts.length - 1] : null;
+      var flowLatest = flowPts.length ? flowPts[flowPts.length - 1] : null;
+      if (stageLatest){
+        rows.push(['Gage height', stageLatest.value + ' ft']);
+        rows.push(['Observed', fmtTime(new Date(stageLatest.time))]);
+      }
+      if (flowLatest){
+        rows.push(['Discharge', Number(flowLatest.value).toLocaleString() + ' ft³/s']);
+        if (!stageLatest) rows.push(['Observed', fmtTime(new Date(flowLatest.time))]);
+      }
+      fillTable('riverTable', rows.length ? rows : [['Status', 'No recent readings returned']]);
+
+      document.getElementById('ro-stage').innerHTML = (stageLatest ? stageLatest.value : '—') + '<span class="unit">ft</span>';
+      document.getElementById('ro-stage').classList.remove('loading');
+    }
+
+    fetchTimeout(historyUrl, 12000)
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(json){
+        var points = (json.features || []).map(function(f){ return f.properties; });
+        renderRiver(points);
+      })
+      .catch(function(err){
+        // History call failed — try the single latest reading before giving up.
+        var latestUrl = 'https://api.waterdata.usgs.gov/ogcapi/v0/collections/latest-continuous/items' +
+          '?f=json&monitoring_location_id=' + locationId + '&parameter_code=00065,00060';
+        fetchTimeout(latestUrl, 8000)
+          .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(function(json){
+            document.getElementById('riverChart').closest('.chart-holder').style.display = 'none';
+            showError('riverError', 'Only the latest reading is available right now — chart history failed to load (' + err.message + ').');
+            var points = (json.features || []).map(function(f){ return f.properties; });
+            renderRiver(points);
+          })
+          .catch(function(err2){
+            showError('riverError',
+              'Could not load live USGS data for site ' + USGS_SITE + '. ' +
+              'First error: ' + err.message + '. Fallback error: ' + err2.message + '.');
+            document.getElementById('ro-stage').textContent = 'n/a';
+          });
+      });
+  }
+
+  // =====================================================================
+  // GARDEN SENSORS — CSV files synced from Slack #tgif into /data/garden
+  // Static hosting can't list a folder, so a manifest.json indexes files.
+  // =====================================================================
+
+  // Minimal CSV parser. Handles quoted fields with embedded commas.
+  function parseCSV(text){
+    var rows = [];
+    var row = [], field = '', inQuotes = false;
+    for (var i = 0; i < text.length; i++){
+      var c = text[i];
+      if (inQuotes){
+        if (c === '"'){
+          if (text[i+1] === '"'){ field += '"'; i++; } else { inQuotes = false; }
+        } else { field += c; }
+      } else {
+        if (c === '"'){ inQuotes = true; }
+        else if (c === ','){ row.push(field); field = ''; }
+        else if (c === '\n' || c === '\r'){
+          if (c === '\r' && text[i+1] === '\n') i++;
+          row.push(field); field = '';
+          if (row.length > 1 || row[0] !== '') rows.push(row);
+          row = [];
+        } else { field += c; }
+      }
+    }
+    if (field !== '' || row.length){ row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  // HOBO-style exports sometimes have a title row before the real header.
+  // Heuristic: use the first row that contains a "date" or "time" cell.
+  function findHeaderRow(rows){
+    for (var i = 0; i < Math.min(rows.length, 5); i++){
+      var joined = rows[i].join(' ').toLowerCase();
+      if (joined.indexOf('date') !== -1 || joined.indexOf('time') !== -1) return i;
+    }
+    return 0;
+  }
+
+  // HOBO-style column headers look like "Temp, °F (LGR S/N: 12345, SEN S/N: 12345)"
+  // or "RH, %". Pull out the actual unit rather than just the first word.
+  function extractUnit(colName){
+    var deg = colName.match(/°\s?[CF]/);
+    if (deg) return deg[0].replace(/\s/, '');
+    var afterComma = colName.match(/,\s*([^,(]+)/);
+    if (afterComma) return afterComma[1].trim();
+    return '';
+  }
+
+  function buildGardenSection(files){
+    var content = document.getElementById('gardenContent');
+
+    if (!files.length){
+      content.innerHTML =
+        '<div class="empty-state">No White Creek temperature data synced yet.<br><br>' +
+        'The dashboard reads CSV files listed in <code>data/garden/manifest.json</code>. ' +
+        'Once <code>scripts/sync_garden_data.py</code> finds new files in Slack #tgif and commits them, they\'ll appear here automatically.</div>';
+      document.getElementById('ro-garden').textContent = 'no data';
+      return;
+    }
+
+    // Load all listed CSVs and merge.
+    Promise.all(files.map(function(f){
+      return fetch(f.file).then(function(r){ return r.text(); }).then(function(t){ return { meta: f, text: t }; });
+    })).then(function(results){
+      var allSeries = {}; // column name -> [{t: Date, v: number}]
+      var latestPoint = null;
+
+      results.forEach(function(res){
+        var rows = parseCSV(res.text);
+        if (!rows.length) return;
+        var headerIdx = findHeaderRow(rows);
+        var header = rows[headerIdx];
+        var dataRows = rows.slice(headerIdx + 1);
+
+        var timeColIdx = header.findIndex(function(h){ return /date|time/i.test(h); });
+        if (timeColIdx === -1) timeColIdx = 0;
+
+        header.forEach(function(colName, idx){
+          if (idx === timeColIdx || !colName || /^#?$/.test(colName.trim())) return;
+          dataRows.forEach(function(r){
+            var raw = r[idx];
+            var num = parseFloat(raw);
+            var t = new Date(r[timeColIdx]);
+            if (!isNaN(num) && !isNaN(t.getTime())){
+              if (!allSeries[colName]) allSeries[colName] = [];
+              allSeries[colName].push({ t: t, v: num });
+              if (!latestPoint || t > latestPoint.t) latestPoint = { t: t, v: num, col: colName };
+            }
+          });
+        });
+      });
+
+      var cols = Object.keys(allSeries);
+      if (!cols.length){
+        content.innerHTML = '<div class="empty-state">Sensor files were found but no numeric columns could be parsed. Check the CSV format in data/garden/ against the parser in this page\'s script.</div>';
+        return;
+      }
+
+      cols.forEach(function(c){ allSeries[c].sort(function(a,b){ return a.t - b.t; }); });
+
+      var html = '';
+      html += '<div class="field-row">';
+      html += '<label class="picker-label" for="gardenVarPicker">Variable</label>';
+      html += '<select class="picker" id="gardenVarPicker">';
+      cols.forEach(function(c){ html += '<option value="' + c.replace(/"/g,'&quot;') + '">' + c + '</option>'; });
+      html += '</select>';
+      html += '<span class="badge">' + files.length + ' file' + (files.length > 1 ? 's' : '') + ' synced</span>';
+      html += '</div>';
+      html += '<div class="chart-holder"><canvas id="gardenChart"></canvas></div>';
+      html += '<div class="chart-toolbar"><button class="zoom-reset" id="gardenZoomReset" type="button">Reset zoom</button></div>';
+      html += '<p class="chart-note">Column detection is automatic from each file\'s header row. Scroll or pinch to zoom, drag to pan.</p>';
+      html += '<table class="data-table" id="gardenFilesTable"><thead><tr><th>File</th><th>Synced</th></tr></thead><tbody>' +
+        files.map(function(f){ return '<tr><td>' + (f.label || f.file) + '</td><td>' + (f.synced || '—') + '</td></tr>'; }).join('') +
+        '</tbody></table>';
+      content.innerHTML = html;
+
+      var chartRef = null;
+      function renderVar(colName){
+        var pts = allSeries[colName];
+        var labels = pts.map(function(p){ return fmtTime(p.t); });
+        var vals = pts.map(function(p){ return p.v; });
+        if (chartRef) chartRef.destroy();
+        chartRef = new Chart(document.getElementById('gardenChart'), {
+          type: 'line',
+          data: { labels: labels, datasets: [{ data: vals, borderColor: moss, backgroundColor: 'rgba(79,123,92,0.08)', fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2 }] },
+          options: baseChartOptions(colName)
+        });
+      }
+      document.getElementById('gardenVarPicker').addEventListener('change', function(e){ renderVar(e.target.value); });
+      document.getElementById('gardenZoomReset').addEventListener('click', function(){
+        if (chartRef && chartRef.resetZoom) chartRef.resetZoom();
+      });
+      var defaultCol = cols.find(function(c){ return /temp/i.test(c); }) || cols[0];
+      document.getElementById('gardenVarPicker').value = defaultCol;
+      renderVar(defaultCol);
+
+      if (latestPoint){
+        document.getElementById('ro-garden').innerHTML = latestPoint.v + '<span class="unit">' + extractUnit(latestPoint.col) + '</span>';
+        document.getElementById('ro-garden').classList.remove('loading');
+        document.getElementById('ro-garden-label').textContent = 'Latest: ' + latestPoint.col.split(',')[0];
+      }
+    }).catch(function(err){
+      content.innerHTML = '<div class="error-note">Found a manifest but could not load the sensor files (' + err.message + ').</div>';
+    });
+  }
+
+  function loadGarden(){
+    fetchTimeout(GARDEN_MANIFEST, 8000)
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(files){ buildGardenSection(files || []); })
+      .catch(function(){ buildGardenSection([]); });
+  }
+
+  loadGarden();
+  loadRiver();
+  loadWeather();
+
+})();
+</script>
+
+</body>
+</html>

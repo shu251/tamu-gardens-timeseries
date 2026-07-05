@@ -3,23 +3,35 @@ project:
   output-dir: docs
   render:
     - tgif-home.qmd
+    - sample-collection.qmd
 
 
 website:
   title: "TAMU Gardens in Focus"
   navbar:
+    background: "#500000"
+    foreground: "#D6D3C4"
+    fontcolor: "#202020"
+    linkcolor: "#202020"
     left:
       - href: tgif-home.qmd
         text: Home
+      - href: sample-collection.qmd
+        text: Sampling
+  
 
 format:
   html:
-    theme: minty
-    css: styles.css
+    theme: 
+      - sandstone
     code-fold: true
     toc: true
-    toc-location: left
+    toc-location: right
+    toc-title: "Navigation"
     number-sections: true
     number-depth: 2
-
+    fontcolor: "#202020"
+    linkcolor: "#500000"
+    backgroundcolor: "#D6D3C4"
+    monobackgroundcolor: "#D6D3C4"
 
